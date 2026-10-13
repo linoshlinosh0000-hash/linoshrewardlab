@@ -8,3 +8,6 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Keep the synthetic experiment in a browser-safe numerical module separate from the screen, so reward calculations are independently testable.
+- Use seeded browser randomness and least-squares regression with ml-matrix; preserve the notebook equations, and disclose that browser random streams differ from NumPy.
