@@ -23,21 +23,21 @@ const mean = (a: number[]) => a.reduce((sum, n) => sum + n, 0) / a.length;
 function candidates(n: number, random: ReturnType<typeof randomSource>): Candidate[] {
   const qualities = Array.from({ length: n }, () => random.normal());
   const flatteries = Array.from({ length: n }, () => Math.abs(random.normal()));
-  return qualities.map((quality, i) => ({ quality, flattery: flatteries[i], length: Math.max(5, Math.min(90, 30 + 7 * flatteries[i] + 8 * random.normal())) }));
+  return qualities.map((quality, i) => { const flattery = flatteries[i] ?? 0; return { quality, flattery, length: Math.max(5, Math.min(90, 30 + 7 * flattery + 8 * random.normal())) }; });
 }
 export function fitProxy(settings: Settings) {
   const random = randomSource(settings.seed + 17);
   const train = candidates(settings.training, random);
   const features = train.map(c => [c.quality, c.flattery, c.length]);
-  const means = [0, 1, 2].map(i => mean(features.map(row => row[i])));
-  const scales = means.map((m, i) => Math.sqrt(mean(features.map(row => (row[i] - m) ** 2))) + 1e-8);
-  const normalize = (c: Candidate) => [c.quality, c.flattery, c.length].map((v, i) => (v - means[i]) / scales[i]);
+  const means = [0, 1, 2].map(i => mean(features.map(row => row[i] ?? 0)));
+  const scales = means.map((m, i) => Math.sqrt(mean(features.map(row => ((row[i] ?? 0) - m) ** 2))) + 1e-8);
+  const normalize = (c: Candidate) => [c.quality, c.flattery, c.length].map((v, i) => (v - (means[i] ?? 0)) / (scales[i] ?? 1));
   const X = new Matrix(train.map(c => [1, ...normalize(c)]));
   const y = Matrix.columnVector(train.map(c => c.quality - 0.30 * c.flattery ** 2 + 0.8 * random.normal()));
   const coef = solve(X, y, true).to1DArray();
   return (c: Candidate) => {
     const z = normalize(c);
-    return coef[0] + z.reduce((sum, v, i) => sum + v * coef[i + 1], 0) + strengths[settings.capacity] * z[1] + 0.65 * z[2];
+    return (coef[0] ?? 0) + z.reduce((sum, v, i) => sum + v * (coef[i + 1] ?? 0), 0) + strengths[settings.capacity] * (z[1] ?? 0) + 0.65 * (z[2] ?? 0);
   };
 }
 export function runExperiment(settings: Settings): Result[] {
@@ -49,8 +49,9 @@ export function runExperiment(settings: Settings): Result[] {
     for (let trial = 0; trial < settings.trials; trial++) {
       const batch = candidates(pool, random);
       let selected = batch[0];
+      if (!selected) continue;
       let score = predict(selected);
-      for (let i = 1; i < batch.length; i++) { const next = predict(batch[i]); if (next > score) { selected = batch[i]; score = next; } }
+      for (const candidate of batch.slice(1)) { const next = predict(candidate); if (next > score) { selected = candidate; score = next; } }
       const gold = goldReward(selected);
       proxies.push(score); golds.push(gold);
       controlled.push(gold + 0.012 * Math.max(selected.length - 30, 0));
@@ -59,10 +60,10 @@ export function runExperiment(settings: Settings): Result[] {
     }
     const boot = Array.from({ length: 800 }, () => {
       let sum = 0;
-      for (let i = 0; i < golds.length; i++) sum += golds[Math.floor(random.uniform() * golds.length)];
+      for (let i = 0; i < golds.length; i++) sum += golds[Math.floor(random.uniform() * golds.length)] ?? 0;
       return sum / golds.length;
     }).sort((a, b) => a - b);
-    const quantile = (q: number) => { const index = (boot.length - 1) * q; const low = Math.floor(index); return boot[low] + (boot[Math.ceil(index)] - boot[low]) * (index - low); };
+    const quantile = (q: number) => { const index = (boot.length - 1) * q; const low = Math.floor(index); const a = boot[low] ?? 0; const b = boot[Math.ceil(index)] ?? a; return a + (b - a) * (index - low); };
     rows.push({ pool, proxy: mean(proxies), gold: mean(golds), low: quantile(.025), high: quantile(.975), controlled: mean(controlled), judge: mean(judges), length: mean(lengths), flattery: mean(flattery) });
   }
   return rows;

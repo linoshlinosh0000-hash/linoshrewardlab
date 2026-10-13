@@ -16,6 +16,7 @@ describe('reward experiment', () => {
   it('reveals proxy and gold divergence under the default stress test', () => {
     const rows = runExperiment(defaults);
     const first = rows[0], last = rows[rows.length - 1];
+    if (!first || !last) throw new Error('Expected experiment rows');
     expect(last.proxy).toBeGreaterThan(first.proxy);
     expect(last.gold).toBeLessThan(first.gold);
   });
